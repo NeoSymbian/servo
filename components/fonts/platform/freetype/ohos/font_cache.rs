@@ -130,6 +130,13 @@ fn get_directory() -> Result<PathBuf, Box<dyn Error>> {
 
 /// Helper function to parse the filename. The naming format is
 /// <OS_VERSION>_<revision date>_font-cache.bin.
+#[cfg(target_os = "symbian")]
+fn parse_filename() -> Result<String, Box<dyn Error>> {
+    // NeoSymbian: the fonts come with the ROM; the engine's version keys the cache (only with a config dir)
+    Ok([env!("CARGO_PKG_VERSION"), CACHE_REVISION, CACHE_FILENAME_SUFFIX].concat())
+}
+
+#[cfg(not(target_os = "symbian"))]
 fn parse_filename() -> Result<String, Box<dyn Error>> {
     let filename = ohos_deviceinfo::get_incremental_version()
         .map(|os_version| [os_version, CACHE_REVISION, CACHE_FILENAME_SUFFIX].concat())
