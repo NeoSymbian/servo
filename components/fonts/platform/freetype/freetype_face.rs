@@ -26,7 +26,7 @@ use crate::platform::freetype::library_handle::FreeTypeLibraryHandle;
 ///
 /// This defaults to slight hinting, which is what most Linux distros use by
 /// default, and is a better default than no hinting.
-#[cfg(not(any(target_os = "android", target_env = "ohos")))]
+#[cfg(not(any(target_os = "android", target_env = "ohos", target_os = "symbian")))]
 pub(crate) const FALLBACK_HINTING_STYLE: FontHinting = FontHinting::Light;
 
 /// The fallback hinting style to use when there is no user-specified default
@@ -34,7 +34,7 @@ pub(crate) const FALLBACK_HINTING_STYLE: FontHinting = FontHinting::Light;
 ///
 /// This defaults to no hinting, as embedded devices such as Android and OHOS
 /// typically have high density screens.
-#[cfg(any(target_os = "android", target_env = "ohos"))]
+#[cfg(any(target_os = "android", target_env = "ohos", target_os = "symbian"))]
 pub(crate) const FALLBACK_HINTING_STYLE: FontHinting = FontHinting::None;
 
 fn fallback_free_type_hinting_load_flags() -> FT_Int32 {

@@ -42,8 +42,29 @@ const UNICODE_BLOCK_SET_WORDS: usize = 6;
 static OHOS_FONTS_DIR: &str = env!("OHOS_SDK_FONTS_DIR");
 
 /// On OpenHarmony devices the fonts are always located here.
-#[cfg(not(ohos_mock))]
+#[cfg(all(not(ohos_mock), not(target_os = "symbian")))]
 static OHOS_FONTS_DIR: &str = "/system/fonts";
+
+/// NeoSymbian: the browser's fonts in the ROM (Z:), unless the build names another directory.
+#[cfg(all(not(ohos_mock), target_os = "symbian"))]
+static OHOS_FONTS_DIR: &str = match option_env!("NEOSYMBIAN_FONTS_DIR") {
+    Some(dir) => dir,
+    None => "Z:/resource/neoweb/fonts",
+};
+
+/// The default family, and the families the generic names map to.
+#[cfg(not(target_os = "symbian"))]
+const DEFAULT_FAMILY: &str = "HarmonyOS Sans";
+#[cfg(not(target_os = "symbian"))]
+const SERIF_FAMILY: &str = "Noto Serif";
+#[cfg(not(target_os = "symbian"))]
+const MONOSPACE_FAMILY: &str = "Noto Sans Mono";
+#[cfg(target_os = "symbian")]
+const DEFAULT_FAMILY: &str = "DejaVu Sans";
+#[cfg(target_os = "symbian")]
+const SERIF_FAMILY: &str = "DejaVu Serif";
+#[cfg(target_os = "symbian")]
+const MONOSPACE_FAMILY: &str = "DejaVu Sans Mono";
 
 #[derive(Clone, Copy, Debug, Default, Serialize, Deserialize)]
 // HarmonyOS only comes in Condensed and Normal variants
@@ -378,17 +399,17 @@ impl FontList {
             // Note: ideally the aliases should be read from fontconfig.json
             FontAlias {
                 from: "serif".to_string(),
-                to: "Noto Serif".to_string(),
+                to: SERIF_FAMILY.to_string(),
                 weight: None,
             },
             FontAlias {
                 from: "sans-serif".to_string(),
-                to: "HarmonyOS Sans".to_string(),
+                to: DEFAULT_FAMILY.to_string(),
                 weight: None,
             },
             FontAlias {
                 from: "monospace".to_string(),
-                to: "Noto Sans Mono".to_string(),
+                to: MONOSPACE_FAMILY.to_string(),
                 weight: Some(400),
             },
             FontAlias {
@@ -522,7 +543,7 @@ pub fn fallback_font_families(options: FallbackFontSelectionOptions) -> Vec<&'st
 pub(crate) fn default_system_generic_font_family(
     generic: GenericFontFamily,
 ) -> LowercaseFontFamilyName {
-    let default_font = "HarmonyOS Sans".into();
+    let default_font = DEFAULT_FAMILY.into();
     match generic {
         GenericFontFamily::Monospace => {
             if let Some(alias) = FONT_LIST.find_alias("monospace") {

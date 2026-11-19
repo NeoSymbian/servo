@@ -205,6 +205,10 @@ impl Painter {
             clear_color[3] as f32,
         );
 
+        // SWGL (WebRender's software GL) supports only LESS/LEQUAL depth tests, so it can't clear picture caches with
+        // quads (that path uses DepthFunction::Always). Gecko turns the quad clears off for software WebRender too.
+        let software_webrender = webrender_gl.get_string(RENDERER) == "Software WebRender";
+
         // Use same texture upload method as Gecko with ANGLE:
         // https://searchfox.org/mozilla-central/source/gfx/webrender_bindings/src/bindings.rs#1215-1219
         let upload_method = if webrender_gl.get_string(RENDERER).starts_with("ANGLE") {
@@ -251,6 +255,7 @@ impl Painter {
                 enable_subpixel_aa: pref!(gfx_subpixel_text_antialiasing_enabled),
                 allow_texture_swizzling: pref!(gfx_texture_swizzling_enabled),
                 enable_dithering: true,
+                clear_caches_with_quads: !software_webrender,
                 clear_color,
                 upload_method,
                 workers,

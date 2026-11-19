@@ -19,12 +19,12 @@ mod android {
 #[cfg(target_os = "android")]
 pub use self::android::font_list;
 
-#[cfg(any(target_env = "ohos", ohos_mock))]
+#[cfg(any(target_env = "ohos", ohos_mock, target_os = "symbian"))]
 mod ohos {
     mod font_cache;
     pub mod font_list;
 }
-#[cfg(any(target_env = "ohos", ohos_mock))]
+#[cfg(any(target_env = "ohos", ohos_mock, target_os = "symbian"))]
 pub use self::ohos::font_list;
 
 mod library_handle;

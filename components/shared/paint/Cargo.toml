@@ -43,9 +43,13 @@ smallvec = { workspace = true }
 strum = { workspace = true }
 stylo = { workspace = true }
 stylo_traits = { workspace = true }
-surfman = { workspace = true, features = ["sm-x11"] }
+surfman = { workspace = true }
 tracing = { workspace = true, optional = true }
 webrender_api = { workspace = true }
 
 [lints]
 workspace = true
+
+# NeoSymbian: no X11 there (only SWGL, through our own RenderingContext)
+[target.'cfg(not(target_os = "symbian"))'.dependencies]
+surfman = { workspace = true, features = ["sm-x11"] }
