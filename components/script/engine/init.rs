@@ -11,7 +11,7 @@ use crate::dom::bindings::conversions::is_dom_proxy;
 use crate::dom::bindings::utils::is_platform_object_static;
 use crate::engine::handle::JSEngineSetup;
 
-#[cfg(unix)]
+#[cfg(all(unix, not(target_os = "symbian")))]
 #[expect(unsafe_code)]
 fn raise_file_handle_limit() {
     // Chromium uses 8192 as the maximum number of file handles on macOS, Linux,
@@ -44,7 +44,8 @@ fn raise_file_handle_limit() {
     }
 }
 
-#[cfg(not(unix))]
+// NeoSymbian: P.I.P.S. has no rlimits
+#[cfg(any(not(unix), target_os = "symbian"))]
 fn raise_file_handle_limit() {}
 
 #[expect(unsafe_code)]

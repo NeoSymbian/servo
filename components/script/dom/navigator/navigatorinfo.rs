@@ -46,7 +46,13 @@ pub(crate) fn Platform() -> DOMString {
 }
 
 #[expect(non_snake_case)]
-#[cfg(any(target_os = "android", target_os = "linux", target_os = "freebsd"))]
+// NeoSymbian: "Linux", as Android reports, for what sites expect
+#[cfg(any(
+    target_os = "android",
+    target_os = "linux",
+    target_os = "freebsd",
+    target_os = "symbian"
+))]
 pub(crate) fn Platform() -> DOMString {
     DOMString::from_static("Linux")
 }
