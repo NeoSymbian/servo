@@ -81,6 +81,7 @@ use rand::TryRng;
 use rand::rngs::SysRng;
 use rustc_hash::{FxHashMap, FxHashSet};
 use script_bindings::cell::DomRefCell;
+use script_bindings::codegen::GenericBindings::DocumentBinding::DocumentVisibilityState;
 use script_traits::{
     ConstellationInputEvent, DiscardBrowsingContext, DocumentActivity, InitialScriptState,
     NewPipelineInfo, Painter, ScriptThreadMessage, UpdatePipelineIdReason, WebViewState,
@@ -1155,24 +1156,29 @@ impl ScriptThread {
                 continue;
             }
 
-            // Step 3. Filter non-renderable documents:
-            // Remove from docs any Document object doc for which any of the following are true:
-            if
-            // doc is render-blocked;
-            document.is_render_blocked()
-            // doc's visibility state is "hidden";
-            // TODO: Currently, this would mean that the script thread does nothing, since
-            // documents aren't currently correctly set to the visible state when navigating
-
-            // doc's rendering is suppressed for view transitions; or
-            // TODO
-
-            // doc's node navigable doesn't currently have a rendering opportunity.
+            // > 3. Filter non-renderable documents: Remove from docs any Document object doc for
+            // > which any of the following are true:
+            // > - doc is render-blocked;
+            // > - doc's visibility state is "hidden";
+            // > - doc's rendering is suppressed for view transitions; or
+            // > - doc's node navigable doesn't currently have a rendering opportunity.
             //
-            // This is implicitly the case when we call this method
+            // TODO: Add support for view transitions.
+            //
+            // Note: This document's navigable implicitly has a rendering opportunity when
+            // this method is called.
+            if document.is_render_blocked() ||
+                document.VisibilityState() == DocumentVisibilityState::Hidden
             {
                 continue;
             }
+
+            // > 4. Unnecessary rendering: Remove from docs any Document object doc for which all
+            // > of the following are true:
+            // >  - the user agent believes that updating the rendering of doc's node navigable would
+            // >    have no visible effect; and
+            // >  - doc's map of animation frame callbacks is empty.
+            // TODO: Implement this.
 
             // Clear this as early as possible so that any callbacks that
             // trigger new reasons for updating the rendering don't get lost.
@@ -1213,24 +1219,21 @@ impl ScriptThread {
             let mut realm = enter_auto_realm(cx, &*document);
             let cx = &mut realm.current_realm();
 
-            // Do not update animations or run rAFs if a Document is throttled.
-            if !document.window().throttled() {
-                // > 11. For each doc of docs, update animations and send events for doc, passing
-                // > in relative high resolution time given frameTimestamp and doc's relevant
-                // > global object as the timestamp [WEBANIMATIONS]
-                document.update_animations_and_send_events(cx);
+            // > 11. For each doc of docs, update animations and send events for doc, passing
+            // > in relative high resolution time given frameTimestamp and doc's relevant
+            // > global object as the timestamp [WEBANIMATIONS]
+            document.update_animations_and_send_events(cx);
 
-                // TODO(#31866): Implement "run the fullscreen steps" from
-                // https://fullscreen.spec.whatwg.org/multipage/#run-the-fullscreen-steps.
+            // TODO(#31866): Implement "run the fullscreen steps" from
+            // https://fullscreen.spec.whatwg.org/multipage/#run-the-fullscreen-steps.
 
-                // TODO(#31868): Implement the "context lost steps" from
-                // https://html.spec.whatwg.org/multipage/#context-lost-steps.
+            // TODO(#31868): Implement the "context lost steps" from
+            // https://html.spec.whatwg.org/multipage/#context-lost-steps.
 
-                // > 14. For each doc of docs, run the animation frame callbacks for doc, passing
-                // > in the relative high resolution time given frameTimestamp and doc's
-                // > relevant global object as the timestamp.
-                document.run_the_animation_frame_callbacks(cx);
-            }
+            // > 14. For each doc of docs, run the animation frame callbacks for doc, passing
+            // > in the relative high resolution time given frameTimestamp and doc's
+            // > relevant global object as the timestamp.
+            document.run_the_animation_frame_callbacks(cx);
 
             // Run the resize observer steps. Note that this can cause a reflow
             // of the Document.
@@ -2876,6 +2879,23 @@ impl ScriptThread {
         let window = self.documents.borrow().find_window(pipeline_id);
         match window {
             Some(window) => {
+                let trusted_document = Trusted::new(&*window.Document());
+                let task = task!(update_visibility_state: move |cx| {
+                    let visibility_state = if throttled {
+                        DocumentVisibilityState::Hidden
+                    } else {
+                        DocumentVisibilityState::Visible
+                    };
+                    trusted_document.root()
+                        .update_visibility_state(cx, visibility_state);
+                });
+
+                window
+                    .as_global_scope()
+                    .task_manager()
+                    .user_interaction_task_source()
+                    .queue(task);
+
                 window.set_throttled(throttled);
                 return;
             },
@@ -3742,6 +3762,13 @@ impl ScriptThread {
         // Step 10. Set window's associated Document to document.
         window.init_document(&document);
 
+        if incomplete.throttled {
+            window.set_throttled(true);
+            document.set_the_initial_visibility_state(cx, DocumentVisibilityState::Hidden);
+        } else {
+            document.set_the_initial_visibility_state(cx, DocumentVisibilityState::Visible);
+        }
+
         let iframe = incomplete.parent_info.and_then(|parent_id| {
             self.documents
                 .borrow()
@@ -3893,10 +3920,6 @@ impl ScriptThread {
             window.resume(cx);
         } else {
             window.suspend(cx);
-        }
-
-        if incomplete.throttled {
-            window.set_throttled(true);
         }
 
         document

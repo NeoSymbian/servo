@@ -3817,7 +3817,8 @@ impl Window {
         }
     }
 
-    /// Set whether to use less resources by running timers at a heavily limited rate.
+    /// Set whether to use less resources by running timers at a heavily limited rate and
+    /// update to the `Document` visibility state to either "hidden" or "visible".
     pub(crate) fn set_throttled(&self, throttled: bool) {
         self.throttled.set(throttled);
         if throttled {

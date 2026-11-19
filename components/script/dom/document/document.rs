@@ -4470,10 +4470,7 @@ impl Document {
             declarative_refresh: Default::default(),
             resize_observers: Default::default(),
             fonts: Default::default(),
-            // TODO: This is intended to workaround the issue where `visibilityState`
-            // is always hidden. This should really be hooked with system visibility
-            // which involves more work.
-            visibility_state: Cell::new(DocumentVisibilityState::Visible),
+            visibility_state: Cell::new(DocumentVisibilityState::Hidden),
             status_code,
             is_initial_about_blank: Cell::new(is_initial_about_blank),
             allow_declarative_shadow_roots: Cell::new(allow_declarative_shadow_roots),
@@ -5455,7 +5452,7 @@ impl Document {
     }
 
     /// <https://html.spec.whatwg.org/multipage/#visibility-state>
-    fn update_visibility_state(
+    pub(crate) fn update_visibility_state(
         &self,
         cx: &mut JSContext,
         visibility_state: DocumentVisibilityState,
@@ -5511,6 +5508,26 @@ impl Document {
         // Step 7 Fire an event named visibilitychange at document, with its bubbles attribute initialized to true.
         self.upcast::<EventTarget>()
             .fire_bubbling_event(cx, atom!("visibilitychange"));
+    }
+
+    /// <https://html.spec.whatwg.org/multipage/#set-the-initial-visibility-state>
+    pub(crate) fn set_the_initial_visibility_state(
+        &self,
+        cx: &mut JSContext,
+        visibility_state: DocumentVisibilityState,
+    ) {
+        // Step 1. Set document's visibility state to visibilityState.
+        self.visibility_state.set(visibility_state);
+        // Step 2. Queue a new VisibilityStateEntry whose visibility state is document's visibility
+        // state and whose timestamp is 0.
+        let performance = self.window.Performance(cx);
+        let entry = VisibilityStateEntry::new(
+            cx,
+            &self.global(),
+            visibility_state,
+            performance.time_origin(),
+        );
+        performance.queue_entry(entry.upcast::<PerformanceEntry>());
     }
 
     /// <https://html.spec.whatwg.org/multipage/#is-initial-about:blank>
