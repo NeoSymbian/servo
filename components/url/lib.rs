@@ -163,7 +163,16 @@ impl ServoUrl {
     }
 
     pub fn to_file_path(&self) -> Result<::std::path::PathBuf, UrlError> {
-        self.0.to_file_path().map_err(|_| UrlError::ToFilePath)
+        let path = self.0.to_file_path().map_err(|_| UrlError::ToFilePath)?;
+        // NeoSymbian: file:///Z:/resource/x is the drive path Z:/resource/x, not /Z:/resource/x
+        #[cfg(target_os = "symbian")]
+        {
+            let b = path.as_os_str().as_encoded_bytes();
+            if b.len() >= 3 && b[0] == b'/' && b[1].is_ascii_alphabetic() && b[2] == b':' {
+                return Ok(path.strip_prefix("/").map_err(|_| UrlError::ToFilePath)?.to_path_buf());
+            }
+        }
+        Ok(path)
     }
 
     pub fn host(&self) -> Option<url::Host<&str>> {
