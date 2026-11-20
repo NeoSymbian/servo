@@ -430,16 +430,23 @@ impl Painter {
             None,
             time_profiler_channel.clone(),
             || {
+                let t0 = std::time::Instant::now();
                 if let Some(renderer) = self.webrender_renderer.as_mut() {
                     renderer.update();
                 }
+                let t1 = std::time::Instant::now();
 
                 // Paint the scene.
                 // TODO(gw): Take notice of any errors the renderer returns!
                 self.clear_background();
+                let t2 = std::time::Instant::now();
                 if let Some(renderer) = self.webrender_renderer.as_mut() {
                     let size = self.rendering_context.size2d().to_i32();
-                    renderer.render(size, 0 /* buffer_age */).ok();
+                    let results = renderer.render(size, 0 /* buffer_age */).ok();
+                    // NeoSymbian (browser WB5b): where a frame's time goes, with pref paint_timing_log
+                    if servo_config::pref!(paint_timing_log) {
+                        paint_timing::add(t1 - t0, t2 - t1, t2.elapsed(), results.as_ref());
+                    }
                 }
             }
         );
@@ -1716,4 +1723,65 @@ impl SceneBuilderHooks for BoostWebRenderThread {
     fn poke(&self) {}
 
     fn deregister(&self) {}
+}
+
+/// NeoSymbian (browser WB5b): paint timing on the debug log every 2 s while frames are painted (pref
+/// `paint_timing_log`): WebRender's update, the clear, the render, how many frames rasterized a tile, draw calls
+/// and the dirty area.
+mod paint_timing {
+    use std::cell::RefCell;
+    use std::time::{Duration, Instant};
+
+    #[derive(Default)]
+    struct Acc {
+        since: Option<Instant>,
+        frames: u32,
+        update: Duration,
+        clear: Duration,
+        render: Duration,
+        rasterized: u32,
+        draw_calls: usize,
+        dirty_px: u64,
+    }
+
+    thread_local!(static ACC: RefCell<Acc> = RefCell::default());
+
+    pub(super) fn add(
+        update: Duration,
+        clear: Duration,
+        render: Duration,
+        results: Option<&webrender::RenderResults>,
+    ) {
+        ACC.with_borrow_mut(|a| {
+            let since = *a.since.get_or_insert_with(Instant::now);
+            a.frames += 1;
+            a.update += update;
+            a.clear += clear;
+            a.render += render;
+            if let Some(r) = results {
+                a.rasterized += r.did_rasterize_any_tile as u32;
+                a.draw_calls += r.stats.total_draw_calls;
+                a.dirty_px += r
+                    .dirty_rects
+                    .iter()
+                    .map(|d| d.area() as u64)
+                    .sum::<u64>();
+            }
+            if since.elapsed() >= Duration::from_secs(2) {
+                let n = a.frames.max(1);
+                println!(
+                    "paint: {} frames/{} ms: update {} render {} clear {} ms avg; rasterized {}, draws {}/frame, dirty {} kpx/frame",
+                    a.frames,
+                    since.elapsed().as_millis(),
+                    a.update.as_millis() / n as u128,
+                    a.render.as_millis() / n as u128,
+                    a.clear.as_millis() / n as u128,
+                    a.rasterized,
+                    a.draw_calls / n as usize,
+                    a.dirty_px / u64::from(n) / 1000,
+                );
+                *a = Acc::default();
+            }
+        });
+    }
 }
