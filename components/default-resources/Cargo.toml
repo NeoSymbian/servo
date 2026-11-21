@@ -12,6 +12,12 @@ rust-version.workspace = true
 [lib]
 path = "lib.rs"
 
+[features]
+# NeoSymbian: register this reader with Servo; an embedder that serves some resources itself turns this off and
+# hands the rest to `DefaultResourceReader`.
+default = ["register"]
+register = []
+
 [dependencies]
 embedder_traits = { workspace = true }
 

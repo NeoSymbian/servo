@@ -36,4 +36,5 @@ impl ResourceReaderMethods for DefaultResourceReader {
     }
 }
 
+#[cfg(feature = "register")]
 embedder_traits::submit_resource_reader!(&DefaultResourceReader);
