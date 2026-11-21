@@ -156,6 +156,8 @@ pub struct Preferences {
     pub dom_entries_api_enabled: bool,
     // feature: Document.execCommand | #25005 | Web/API/Document/execCommand
     pub dom_exec_command_enabled: bool,
+    /// NeoSymbian (browser WB5b): paint timing on the debug log (components/paint/painter.rs).
+    pub paint_timing_log: bool,
     // feature: CSS Font Loading API | #29376 | Web/API/CSS_Font_Loading_API
     pub dom_fontface_enabled: bool,
     pub dom_fullscreen_test: bool,
@@ -452,6 +454,7 @@ impl Preferences {
             dom_document_dblclick_timeout: 300,
             dom_entries_api_enabled: false,
             dom_exec_command_enabled: false,
+            paint_timing_log: false,
             dom_fontface_enabled: false,
             dom_fullscreen_test: false,
             dom_gamepad_enabled: true,
