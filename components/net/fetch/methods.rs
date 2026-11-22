@@ -584,6 +584,11 @@ pub async fn main_fetch(
             else if (same_origin && request.response_tainting == ResponseTainting::Basic) ||
                 // request's current URL's scheme is "data"
                 current_scheme == "data" ||
+                // NeoSymbian: the certificate error page's override (`chrome:allowcert`, guarded by
+                // PRIVILEGED_SECRET) comes from the failed site's document; as a cross-origin XHR it was refused
+                // here as an unsupported scheme and never reached scheme_fetch.
+                (current_scheme == "chrome" &&
+                    request.current_url_with_blob_claim().path() == "allowcert") ||
                 // Note: Although it is not part of the specification, we make an exception here
                 // for custom protocols that are explicitly marked as active for fetch.
                 context.protocols.is_fetchable(current_scheme) ||
